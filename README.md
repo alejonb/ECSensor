@@ -4,6 +4,9 @@
 * DS18820 Temperature sensor by contact. Preffer with probe.
 * TM1637 4-digits arduino display sensor.
 * Arduino nano 
+
+### Pseudo schematic
+![Alt text](./schematic.png?raw=true "Cxt")
 ### Considerations 
 #### Converting to ppm
 * Hana      [USA]        PPMconverion:  0.5
