@@ -19,7 +19,7 @@ The value below will change depending on what chemical solution we are measuring
 
  
 #### Cell Constant For Ec Measurements
-float K=2.45; ## The last time i calibrate with hana buffer
+float K=2.45; **The last time i calibrate with hana buffer**
 
 ### REF
 * https://create.arduino.cc/projecthub/mircemk/arduino-electrical-conductivity-ec-ppm-tds-meter-c48201  
