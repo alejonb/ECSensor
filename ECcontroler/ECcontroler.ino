@@ -109,9 +109,9 @@ void loop()
     delay_timer = millis();
     GetEC();          //Calls Code to Go into GetEC() Loop [Below Main Loop] dont call this more that 1/5 hhz [once every five seconds] or you will polarise the water
     //displayEC((int)(EC25*1000));
-    displayValue((int)(ppm),"sense");
+    displayValue((int)abs(ppm),"sense");
   }else{
-    displayValue((int)(ppm),"desired");    
+    displayValue((int)( get_desired_EC()),"desired");    
     wait_for_command();
   } 
   delay(100);  
@@ -128,11 +128,14 @@ void wait_for_command(){
     String command = "NONE";
     command = myObject["COMMAND"];
     if(command.equals("ECREAD")){      
-        Data["PPM"] = ppm;
-        Data["ACK"] = "DONE";  
+      Data["PPM"] = ppm;
+      Data["DESIRED_PPM"] = get_desired_EC();
+      Data["ACK"] = "DONE";  
+      Data["MSG"] = msg;
     }else if(command.equals("ECUP")){
-        ecUp();   
-        Data["ACK"] = "DONE";       
+      ecUp();   
+      Data["MSG"] = msg;
+      Data["ACK"] = "DONE";             
     }else{        
       Data["ACK"] = "ERROR";
       Data["MSG"] = msg;
