@@ -129,6 +129,7 @@ void wait_for_command(){
     command = myObject["COMMAND"];
     if(command.equals("ECREAD")){      
       Data["PPM"] = ppm;
+      Data["Temperature"] = Temperature;
       Data["DESIRED_PPM"] = get_desired_EC();
       Data["ACK"] = "DONE";  
       Data["MSG"] = msg;
