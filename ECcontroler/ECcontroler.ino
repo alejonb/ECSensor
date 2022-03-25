@@ -11,7 +11,7 @@
 #define ZERO_SPEED 0
 #define POT_PIN A2
 #define DROP_TIME 100
-#define MAX_DROP_TIME 60000
+#define MAX_DROP_TIME 70000
 
 //************************* User Defined Variables ********************************************************//
 
