@@ -147,7 +147,7 @@ void wait_for_command()
       //ecUp(M_EC_UP_SPEED, DROP_TIME)
       ecUp(myObject["SPEED"], myObject["DROP_TIME"]);
       Data["MSG"] = msg;
-      Data["ACK"] = "DONE, SPEED: " + myObject["SPEED"] + " TIME: " + myObject["DROP_TIME"];
+      Data["ACK"] = "DONE, SPEED: " + String(myObject["SPEED"]) + " TIME: " + String(myObject["DROP_TIME"]);
     }
     else if (command.equals("AUTO"))
     {
