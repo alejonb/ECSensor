@@ -51,6 +51,8 @@ float EC = 0;
 float EC25 = 0;
 int ppm = 0;
 boolean manualMode = true;
+int speed = M_EC_UP_SPEED;
+int dropTime = DROP_TIME;
 JSONVar Data;
 
 float raw = 0;
@@ -135,17 +137,19 @@ void wait_for_command()
     }
     else if (command.equals("ECUP"))
     {
-      if (!(DROP_TIME <= myObject["DROP_TIME"] <= MAX_DROP_TIME))
+      dropTime = myObject["DROP_TIME"];
+      speed = myObject["SPEED"];
+      if (!(DROP_TIME <= dropTime <= MAX_DROP_TIME))
       {
-        myObject["DROP_TIME"] = DROP_TIME;
+        dropTime = DROP_TIME;
       }
 
-      if (!(M_EC_UP_SPEED <= myObject["SPEED"] <= MAX_M_EC_SPEED))
+      if (!(M_EC_UP_SPEED <= speed <= MAX_M_EC_SPEED))
       {
-        myObject["EC_UP_SPEED"] = M_EC_UP_SPEED;
+        speed = M_EC_UP_SPEED;
       }
       //ecUp(M_EC_UP_SPEED, DROP_TIME)
-      ecUp(myObject["SPEED"], myObject["DROP_TIME"]);
+      ecUp();
       Data["MSG"] = msg;
       Data["ACK"] = "DONE";
     }
@@ -171,10 +175,10 @@ void wait_for_command()
   }
 }
 
-void ecUp(int speed, int dropTime)
+void ecUp()
 { //M_EC_UP_SPEED
-  analogWrite(M_EC_UP, M_EC_UP_SPEED);
-  delay(DROP_TIME);
+  analogWrite(M_EC_UP, speed);
+  delay(dropTime);
   analogWrite(M_EC_UP, ZERO_SPEED);
 }
 
