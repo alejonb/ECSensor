@@ -6,14 +6,21 @@
 #include <Arduino_JSON.h>
 
 #define M_EC_UP 11
-#define M_EC_UP_SPEED 130
-#define MAX_M_EC_SPEED 1024
+#define M_EC_UP_SPEED 230
 #define ZERO_SPEED 0
-#define POT_PIN A2
-#define DROP_TIME 100
-#define MAX_DROP_TIME 70000
 
-//************************* User Defined Variables ********************************************************//
+#define POT_PIN A2
+#define DROP_TIME 1000
+
+// Controller constants
+#define ERR_MARGIN 50
+#define STABILIZATION_MARGIN 0.1
+
+#define MINUTE 1000L * 60
+#define STABILIZATION_TIME 1 * MINUTE
+
+#define SLEEPING_TIME 100
+// EC Sensor conf
 
 #define EC_PIN A0
 #define EC_GND A1
@@ -22,7 +29,7 @@
 #define PPM_FACTOR 0.5 // Hana      [USA]
 #define TEMP_COEF 0.019
 
-//********************** Cell Constant For Ec Measurements *********************//
+//Cell Constant For Ec Measurements
 #define K 2.45
 
 //##################################################################################
@@ -50,9 +57,10 @@ float Temperature = 10;
 float EC = 0;
 float EC25 = 0;
 int ppm = 0;
-boolean manualMode = true;
-int speed = M_EC_UP_SPEED;
-int dropTime = DROP_TIME;
+int desiredPPM = 0;
+int error = 0;
+
+boolean manualMode = false;
 JSONVar Data;
 
 float raw = 0;
@@ -104,21 +112,54 @@ void setup()
 //Moved Heavy Work To subroutines so you can call them from main loop without cluttering the main loop
 void loop()
 {
-  if (millis() - delay_timer > 5000)
-  {
-    delay_timer = millis();
-    GetEC(); //Calls Code to Go into GetEC() Loop [Below Main Loop] dont call this more that 1/5 hhz [once every five seconds] or you will polarise the water
-    //displayEC((int)(EC25*1000));
-    displayValue((int)abs(ppm), "sense");
-  }
 
-  displayValue((int)(get_desired_EC()), "desired");
-  wait_for_command();
-  delay(100);
+  //displayEC((int)(EC25*1000));
+
+  ppm = GetEC();
+  desiredPPM = get_desired_EC();
+  displayValue(ppm, "sense");
+  displayValue(desiredPPM, "desired");
+  check_for_command();
+
+  if (!manualMode)
+  {
+    error = desiredPPM - ppm;
+
+    if (error > ERR_MARGIN)
+    {
+      do
+      {
+        if (error > 0)
+        {
+          ecUp(DROP_TIME);
+          Serial.println("Going UP!");
+        }
+
+        long start = millis();
+        while (millis() - start < STABILIZATION_TIME)
+        {
+          delay(100);
+
+          ppm = GetEC();
+          desiredPPM = get_desired_EC();
+          displayValue(ppm, "sense");
+          displayValue(desiredPPM, "desired");
+          Serial.print("ppm: ");
+          Serial.print(ppm);
+          Serial.print("\t\tdesiredPPM: ");
+          Serial.println(desiredPPM);
+
+          error = desiredPPM - ppm;
+          check_for_command();
+        }
+      } while (abs(error) > STABILIZATION_MARGIN);
+    }
+  }
+  delay(SLEEPING_TIME);
 }
 //************************************** End Of Main Loop **********************************************************************//
 
-void wait_for_command()
+void check_for_command()
 {
   if (Serial.available() > 0)
   {
@@ -129,7 +170,7 @@ void wait_for_command()
     command = myObject["COMMAND"];
     if (command.equals("ECREAD"))
     {
-      Data["PPM"] = ppm;
+      Data["PPM"] = GetEC();
       Data["Temperature"] = Temperature;
       Data["DESIRED_PPM"] = get_desired_EC();
       Data["ACK"] = "DONE";
@@ -137,21 +178,10 @@ void wait_for_command()
     }
     else if (command.equals("ECUP"))
     {
-      dropTime = myObject["DROP_TIME"];
-      speed = myObject["SPEED"];
-      if (!(DROP_TIME <= dropTime <= MAX_DROP_TIME))
-      {
-        dropTime = DROP_TIME;
-      }
-
-      if (!(M_EC_UP_SPEED <= speed <= MAX_M_EC_SPEED))
-      {
-        speed = M_EC_UP_SPEED;
-      }
-      //ecUp(M_EC_UP_SPEED, DROP_TIME)
-      ecUp();
+      int dropTime = myObject["DROP_TIME"];
+      ecUp(dropTime);
       Data["MSG"] = msg;
-      Data["ACK"] = "DONE SPEED: " + String(speed) + " DROPTIME: " + String(dropTime);
+      Data["ACK"] = "DONE";
     }
     else if (command.equals("AUTO"))
     {
@@ -175,14 +205,14 @@ void wait_for_command()
   }
 }
 
-void ecUp()
+void ecUp(int dropTime)
 { //M_EC_UP_SPEED
-  analogWrite(M_EC_UP, speed);
+  analogWrite(M_EC_UP, M_EC_UP_SPEED);
   delay(dropTime);
   analogWrite(M_EC_UP, ZERO_SPEED);
 }
 
-float get_desired_EC()
+int get_desired_EC()
 {
   return map(analogRead(POT_PIN), 0, 1023, 900, 1300);
 }
@@ -207,24 +237,30 @@ void displayValue(int num, String type)
   }
 }
 
-void GetEC()
+int GetEC()
 {
+  //Calls Code to Go into GetEC() Loop [Below Main Loop] dont call this more that 1/5 hhz [once every five seconds] or you will polarise the water
+  if (millis() - delay_timer > 5000)
+  {
 
-  //*********Reading Temperature Of Solution *******************//
-  sensors.requestTemperatures();            // Send the command to get temperatures
-  Temperature = sensors.getTempCByIndex(0); //Stores Value in Variable
-  //************Estimates Resistance of Liquid ****************//
-  digitalWrite(EC_POWER, HIGH);
-  raw = analogRead(EC_PIN);
-  raw = analogRead(EC_PIN); // This is not a mistake, First reading will be low beause if charged a capacitor
-  digitalWrite(EC_POWER, LOW);
-  //***************** Converts to EC **************************//
-  Vdrop = (Vin * raw) / 1024.0;
-  Rc = (Vdrop * R1) / (Vin - Vdrop);
-  Rc = Rc - Ra; //acounting for Digital Pin Resitance
-  EC = 1000 / (Rc * K);
-  //*************Compensating For Temperaure********************//
-  EC25 = EC / (1 + TEMP_COEF * (Temperature - 25.0));
-  ppm = (EC25) * (PPM_FACTOR * 1000);
+    delay_timer = millis();
+    //*********Reading Temperature Of Solution *******************//
+    sensors.requestTemperatures();            // Send the command to get temperatures
+    Temperature = sensors.getTempCByIndex(0); //Stores Value in Variable
+    //************Estimates Resistance of Liquid ****************//
+    digitalWrite(EC_POWER, HIGH);
+    raw = analogRead(EC_PIN);
+    raw = analogRead(EC_PIN); // This is not a mistake, First reading will be low beause if charged a capacitor
+    digitalWrite(EC_POWER, LOW);
+    //***************** Converts to EC **************************//
+    Vdrop = (Vin * raw) / 1024.0;
+    Rc = (Vdrop * R1) / (Vin - Vdrop);
+    Rc = Rc - Ra; //acounting for Digital Pin Resitance
+    EC = 1000 / (Rc * K);
+    //*************Compensating For Temperaure********************//
+    EC25 = EC / (1 + TEMP_COEF * (Temperature - 25.0));
+    ppm = (EC25) * (PPM_FACTOR * 1000);
+  }
+  return ppm;
 }
 //************************** End OF EC Function ***************************//
